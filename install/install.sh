@@ -47,6 +47,17 @@ set -euo pipefail
   esac
   arch="$(uname -m)"
   case "$arch" in x86_64 | aarch64) ;; *) die "no BHPanel build for this processor ($arch)" ;; esac
+  # What this script needs, installed when missing: a minimal AlmaLinux image
+  # has no tar (the DNS-only test VPS, 2026-10-22) and the install stopped
+  # there. sha256sum and base64 come with coreutils, which is always present.
+  local need=() c
+  for c in curl openssl tar python3; do
+    command -v "$c" >/dev/null || need+=("$c")
+  done
+  if [ "${#need[@]}" -gt 0 ]; then
+    echo "installing what this installer needs: ${need[*]}"
+    dnf install -y -q "${need[@]}" >/dev/null || die "could not install ${need[*]} (dnf install -y ${need[*]})"
+  fi
   for c in curl openssl tar sha256sum python3 base64; do
     command -v "$c" >/dev/null || die "$c is missing (dnf install -y $c)"
   done
