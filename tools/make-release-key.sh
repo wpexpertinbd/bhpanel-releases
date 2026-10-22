@@ -36,16 +36,28 @@ echo "== 1. building the signing tool"
 echo "== 2. generating the key"
 read -r seed pub < <("$T/bhp-release" keygen)
 [ ${#seed} = 44 ] && [ ${#pub} = 44 ] || die "the key did not come out right"
+# gpg asks for the passphrase on this terminal (it cannot when its input is a
+# pipe: "Inappropriate ioctl for device"), so the key goes to it as a file in
+# the private temporary folder, removed on exit.
+GPG_TTY="$(tty)" || die "run this in a terminal - gpg asks for a passphrase"
+export GPG_TTY
+printf '%s' "$seed" > "$T/seed"
 
-echo "== 3. private key -> GitHub ($REPO, environment '$ENV')"
-printf '%s' "$seed" | gh secret set BHP_RELEASE_KEY --repo "$REPO" --env "$ENV"
-
-echo "== 4. encrypted backup (choose a passphrase - gpg asks twice)"
-printf '%s' "$seed" | gpg --symmetric --armor --cipher-algo AES256 --output "$OUT/private-backup.asc.gpg"
+# The backup first: the key reaches GitHub only once a copy is proven to
+# decrypt, so a failure here leaves nothing anywhere.
+echo "== 3. encrypted backup (choose a passphrase - gpg asks twice)"
+rm -f "$OUT/private-backup.asc.gpg"
+gpg --symmetric --armor --cipher-algo AES256 --output "$OUT/private-backup.asc.gpg" "$T/seed" \
+  || die "gpg could not make the backup - nothing was sent to GitHub; run this again"
 echo "   test-decrypting the backup (gpg may ask for the passphrase again)"
-back=$(gpg --quiet --decrypt "$OUT/private-backup.asc.gpg")
-[ "$back" = "$seed" ] || die "the backup does not decrypt to the key - do NOT rely on it"
-unset seed back
+back=$(gpg --quiet --decrypt "$OUT/private-backup.asc.gpg") || die "the backup did not decrypt - nothing was sent to GitHub"
+[ "$back" = "$seed" ] || die "the backup does not decrypt to the key - nothing was sent to GitHub"
+unset back
+
+echo "== 4. private key -> GitHub ($REPO, environment '$ENV')"
+gh secret set BHP_RELEASE_KEY --repo "$REPO" --env "$ENV" < "$T/seed"
+unset seed
+rm -f "$T/seed"
 
 echo "== 5. public key"
 printf '%s\n' "$pub" > "$OUT/public.txt"
