@@ -154,6 +154,16 @@ PY
   else
     bash installer/bhpanel-install.sh all "${args[@]+"${args[@]}"}" </dev/null || rc=$?
   fi
+  if [ "$rc" = 0 ]; then
+    # The channel this was installed from becomes the server's own, so Server >
+    # Update (and the nightly check) can update it. Without it a --beta install
+    # refused every update: "no release channel is chosen" (test-dns, 2026-10-22).
+    if bhpanelctl update.settings.set channel="$channel" >/dev/null 2>&1; then
+      say "5. updates will come from the $channel channel"
+    else
+      say "choose the release channel under Server > Update: this server does not know it yet"
+    fi
+  fi
   if [ "$rc" != 0 ]; then
     # The installer's own guidance names installer/bhpanel-install.sh; through
     # this command nobody knows where that folder is. The installer is safe to
