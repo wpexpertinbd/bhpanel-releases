@@ -10,7 +10,7 @@
 # server never reads a manifest naming a missing file. Anything else is refused,
 # the site keeps what it had, and ALERT is told - once per refused manifest.
 set -euo pipefail
-PUB=REPLACE_WITH_PUBLIC_KEY   # ~/BHPanel-keys/release-signing/public.txt (base64, 32 bytes)
+PUB=AikuERko5esVXrO+/Zp6juc4CXu73p5tcmwpRFfB89A=   # ~/BHPanel-keys/release-signing/public.txt (base64, 32 bytes)
 GH="https://github.com/wpexpertinbd/bhpanel-releases/releases/download"
 ACCT=bhpmain
 SITE=/home/bhpmain/releases.bhpanel.net

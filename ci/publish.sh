@@ -13,6 +13,9 @@ V="${1:?version}"
 REPO="${GITHUB_REPOSITORY:-wpexpertinbd/bhpanel-releases}"
 # The oldest panel this release's installer upgrades from.
 MIN_FROM=0.2.20
+# The public half of the release key - built into bhpaneld
+# (panelReleasePublicKeys) and the mirror (server/release-sync.sh).
+RELEASE_PUB=AikuERko5esVXrO+/Zp6juc4CXu73p5tcmwpRFfB89A=
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 W="$(mktemp -d)"
 trap 'rm -rf "$W"' EXIT
@@ -41,9 +44,10 @@ gh release upload "v$V" --repo "$REPO" --clobber bhpanel-"$V"-linux-*.tar.gz bhp
 jq -n --arg v "$V" --arg min "$MIN_FROM" --arg p "$(date -u +%FT%TZ)" --argjson f "$files" \
   '{schema: 1, channel: "beta", version: $v, published: $p, min_from: $min, files: $f}' > "$W/manifest.json"
 BHP_RELEASE_KEY="$BHP_RELEASE_KEY" "$W/bhp-release" sign "$W/manifest.json" "$W/manifest.json.sig"
-# Checked the way a server checks it, with the public key derived from the key.
-pub=$(BHP_RELEASE_KEY="$BHP_RELEASE_KEY" "$W/bhp-release" sign "$W/manifest.json" /dev/null | awk '{print $3}')
-"$W/bhp-release" verify "$W/manifest.json" "$W/manifest.json.sig" "$pub"
+# Checked the way a server checks it: against the key servers have built in
+# (a secret replaced by mistake would sign releases no server accepts).
+"$W/bhp-release" verify "$W/manifest.json" "$W/manifest.json.sig" "$RELEASE_PUB" \
+  || { echo "the secret BHP_RELEASE_KEY is not the key servers trust ($RELEASE_PUB)"; exit 1; }
 
 if ! gh release view channel-beta --repo "$REPO" >/dev/null 2>&1; then
   gh release create channel-beta --repo "$REPO" --prerelease --title "Channel: beta" \

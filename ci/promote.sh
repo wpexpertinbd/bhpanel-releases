@@ -13,7 +13,8 @@ W="$(mktemp -d)"
 trap 'rm -rf "$W"' EXIT
 
 (cd "$HERE/tool" && go build -o "$W/bhp-release" .)
-pub=$(BHP_RELEASE_KEY="$BHP_RELEASE_KEY" "$W/bhp-release" sign /dev/null /dev/null | awk '{print $3}')
+# The key servers have built in (bhpaneld panelReleasePublicKeys).
+pub=AikuERko5esVXrO+/Zp6juc4CXu73p5tcmwpRFfB89A=
 gh release download channel-beta --repo "$REPO" --dir "$W/beta" --pattern 'manifest.json*'
 "$W/bhp-release" verify "$W/beta/manifest.json" "$W/beta/manifest.json.sig" "$pub"
 got=$(jq -r .version "$W/beta/manifest.json")
