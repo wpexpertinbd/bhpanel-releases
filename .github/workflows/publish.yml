@@ -1,0 +1,84 @@
+name: publish
+
+# A new BHPanel build arrives as the prerelease "incoming-<version>" (uploaded
+# by the private BHPanel repo's release workflow). It is checked here, then
+# SIGNED and published to the beta channel - but only after the owner approves
+# the "sign" environment. Nothing reaches a server unsigned.
+#
+# Releases this repository keeps:
+#   v<version>      the release files (tarballs + .sha256), per version
+#   channel-beta    manifest.json + manifest.json.sig, the beta channel
+#   channel-stable  the same for stable (promote.yml moves a version there)
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: startsWith(github.event.release.tag_name, 'incoming-')
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.c.outputs.version }}
+    steps:
+      - id: c
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          v="${TAG#incoming-}"
+          [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "not a version: $v"; exit 1; }
+          mkdir in && gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir in
+          cd in
+          n=0
+          for a in x86_64 aarch64; do
+            f="bhpanel-$v-linux-$a.tar.gz"
+            [ -f "$f" ] && [ -f "$f.sha256" ] || { echo "missing $f or its .sha256"; exit 1; }
+            sha256sum -c "$f.sha256"
+            n=$((n + 1))
+          done
+          for f in *; do
+            case "$f" in
+              "bhpanel-$v-linux-x86_64.tar.gz"|"bhpanel-$v-linux-x86_64.tar.gz.sha256"|"bhpanel-$v-linux-aarch64.tar.gz"|"bhpanel-$v-linux-aarch64.tar.gz.sha256"|build.txt) ;;
+              *) echo "unexpected file: $f"; exit 1 ;;
+            esac
+          done
+          {
+            echo "## BHPanel $v - waiting for approval"
+            echo
+            echo "Built by: $(cat build.txt 2>/dev/null || echo unknown)"
+            echo
+            echo '```'
+            sha256sum bhpanel-*.tar.gz
+            echo '```'
+            echo "Compare these with the BHPanel release run before approving."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+  sign:
+    needs: check
+    runs-on: ubuntu-24.04
+    # The release key lives only here; GitHub waits for the owner's approval.
+    environment: sign
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25.0"
+          cache: false
+      - name: Sign and publish to beta
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BHP_RELEASE_KEY: ${{ secrets.BHP_RELEASE_KEY }}
+          V: ${{ needs.check.outputs.version }}
+        run: bash ci/publish.sh "$V"

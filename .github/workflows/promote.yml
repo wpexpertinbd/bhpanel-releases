@@ -1,0 +1,39 @@
+name: promote
+
+# Moves the version that is in beta to the stable channel, after the owner
+# approves the "sign" environment. Run by hand once beta has run cleanly.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version in beta to make stable (e.g. 0.2.41)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    environment: sign
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25.0"
+          cache: false
+      - name: Sign and publish to stable
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BHP_RELEASE_KEY: ${{ secrets.BHP_RELEASE_KEY }}
+          V: ${{ inputs.version }}
+        run: bash ci/promote.sh "$V"
