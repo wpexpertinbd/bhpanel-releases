@@ -39,10 +39,14 @@ if ! gh release view "v$V" --repo "$REPO" >/dev/null 2>&1; then
   gh release create "v$V" --repo "$REPO" --title "BHPanel $V" \
     --notes "Signed BHPanel release $V. Servers install it through their panel's updater; the checksums are in the channel manifests."
 fi
-gh release upload "v$V" --repo "$REPO" --clobber bhpanel-"$V"-linux-*.tar.gz bhpanel-"$V"-linux-*.tar.gz.sha256
+# The one-line installer (install/install.sh) travels with the release, named
+# by sha256 in the signed manifest: the mirror serves it only when it matches.
+cp "$HERE/install/install.sh" install.sh
+inst=$(jq -n --arg s "$(sha256sum install.sh | cut -d' ' -f1)" --argjson z "$(stat -c %s install.sh)" '{sha256: $s, size: $z}')
+gh release upload "v$V" --repo "$REPO" --clobber bhpanel-"$V"-linux-*.tar.gz bhpanel-"$V"-linux-*.tar.gz.sha256 install.sh
 
-jq -n --arg v "$V" --arg min "$MIN_FROM" --arg p "$(date -u +%FT%TZ)" --argjson f "$files" \
-  '{schema: 1, channel: "beta", version: $v, published: $p, min_from: $min, files: $f}' > "$W/manifest.json"
+jq -n --arg v "$V" --arg min "$MIN_FROM" --arg p "$(date -u +%FT%TZ)" --argjson f "$files" --argjson i "$inst" \
+  '{schema: 1, channel: "beta", version: $v, published: $p, min_from: $min, files: $f, install_script: $i}' > "$W/manifest.json"
 BHP_RELEASE_KEY="$BHP_RELEASE_KEY" "$W/bhp-release" sign "$W/manifest.json" "$W/manifest.json.sig"
 # Checked the way a server checks it: against the key servers have built in
 # (a secret replaced by mistake would sign releases no server accepts).
