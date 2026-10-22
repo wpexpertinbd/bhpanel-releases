@@ -137,10 +137,30 @@ PY
 
   say "4. the installer ($dest)"
   cd "$dest"
+  local rc=0
   if [ "$tty_ok" = 1 ]; then
-    exec bash installer/bhpanel-install.sh all "${args[@]+"${args[@]}"}" </dev/tty
+    bash installer/bhpanel-install.sh all "${args[@]+"${args[@]}"}" </dev/tty || rc=$?
+  else
+    bash installer/bhpanel-install.sh all "${args[@]+"${args[@]}"}" </dev/null || rc=$?
   fi
-  exec bash installer/bhpanel-install.sh all "${args[@]+"${args[@]}"}" </dev/null
+  if [ "$rc" != 0 ]; then
+    # The installer's own guidance names installer/bhpanel-install.sh; through
+    # this command nobody knows where that folder is. The installer is safe to
+    # run again, so the same line continues where it stopped.
+    printf '\nThe release is unpacked in %s\n' "$dest"
+    printf 'To continue (after a reboot, if the installer asked for one), run the same command again:\n'
+    local shown=() prev=""
+    for a in "$@"; do
+      if [ "$prev" = --license ]; then shown+=("YOUR-KEY"); else shown+=("$a"); fi
+      prev="$a"
+    done
+    if [ "$#" -gt 0 ]; then
+      printf '    curl -fsSL %s/install.sh | bash -s --%s\n' "$BASE" "$(printf ' %q' "${shown[@]}")"
+    else
+      printf '    curl -fsSL %s/install.sh | bash\n' "$BASE"
+    fi
+  fi
+  return "$rc"
 }
 
 main "$@"
