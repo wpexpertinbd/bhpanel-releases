@@ -6,7 +6,7 @@
 #   curl -fsSL https://releases.bhpanel.net/install.sh | bash -s -- --beta --full --license <key>
 #
 # Every option except --beta goes to the panel's installer unchanged (--light,
-# --full, --stack=ols, -y, --admin-user <name>, --license <key>; BHP_LICENSE
+# --full, --dns-only, --stack=ols, -y, --admin-user <name>, --license <key>; BHP_LICENSE
 # in the environment keeps the key out of the process list).
 #
 # Nothing it downloads runs before it is proven to be a release the BHPanel
@@ -56,8 +56,8 @@ set -euo pipefail
   tty_ok=0
   if { : </dev/tty; } 2>/dev/null; then
     tty_ok=1
-  elif ! printf '%s\n' "${args[@]+"${args[@]}"}" | grep -qxE -- '--light|--full|-y'; then
-    die "no terminal to ask on: add --light, --full or -y (curl ... | bash -s -- --light)"
+  elif ! printf '%s\n' "${args[@]+"${args[@]}"}" | grep -qxE -- '--light|--full|--dns-only|-y'; then
+    die "no terminal to ask on: add --light, --full, --dns-only or -y (curl ... | bash -s -- --light)"
   fi
 
   install -d -m 700 "$WORK"
