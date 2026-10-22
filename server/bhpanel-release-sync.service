@@ -1,0 +1,8 @@
+[Unit]
+Description=releases.bhpanel.net - mirror the signed BHPanel release channels
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/root/bhpanel-releases/release-sync.sh
