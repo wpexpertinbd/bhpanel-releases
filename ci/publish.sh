@@ -62,3 +62,5 @@ cat "$W/manifest.json"
 
 gh release delete "incoming-$V" --repo "$REPO" --yes --cleanup-tag
 echo "published $V to beta"
+# Only the versions a channel names stay on GitHub (servers use the mirror).
+bash "$HERE/ci/prune.sh" || echo "pruning old releases failed - nothing else is affected"

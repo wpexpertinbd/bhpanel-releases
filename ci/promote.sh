@@ -30,3 +30,4 @@ fi
 gh release upload channel-stable --repo "$REPO" --clobber "$W/manifest.json" "$W/manifest.json.sig"
 cat "$W/manifest.json"
 echo "promoted $V to stable"
+bash "$HERE/ci/prune.sh" || echo "pruning old releases failed - nothing else is affected"
