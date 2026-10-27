@@ -45,8 +45,31 @@ cp "$HERE/install/install.sh" install.sh
 inst=$(jq -n --arg s "$(sha256sum install.sh | cut -d' ' -f1)" --argjson z "$(stat -c %s install.sh)" '{sha256: $s, size: $z}')
 gh release upload "v$V" --repo "$REPO" --clobber bhpanel-"$V"-linux-*.tar.gz bhpanel-"$V"-linux-*.tar.gz.sha256 install.sh
 
-jq -n --arg v "$V" --arg min "$MIN_FROM" --arg p "$(date -u +%FT%TZ)" --argjson f "$files" --argjson i "$inst" \
-  '{schema: 1, channel: "beta", version: $v, published: $p, min_from: $min, files: $f, install_script: $i}' > "$W/manifest.json"
+# security_fix: the newest release so far that fixed a security problem -
+# this one when it came with security.txt, else what the beta channel already
+# said (checked against the release key first). A panel older than it shows
+# the update as urgent; panels before 0.2.80 ignore the field.
+fix=""
+if [ -f security.txt ]; then
+  [ "$(cat security.txt)" = yes ] || { echo "security.txt must say yes"; exit 1; }
+  fix="$V"
+elif ! prev=$(gh release view channel-beta --repo "$REPO" --json tagName 2>&1); then
+  # Only "there is no beta channel yet" means there is no earlier fix; any
+  # other failure would sign this release without it (Codex).
+  grep -q 'release not found' <<<"$prev" || { echo "the beta channel could not be looked up: $prev"; exit 1; }
+else
+  gh release download channel-beta --repo "$REPO" --dir "$W/prev" --pattern 'manifest.json*' \
+    || { echo "the beta channel's current manifest could not be downloaded"; exit 1; }
+  "$W/bhp-release" verify "$W/prev/manifest.json" "$W/prev/manifest.json.sig" "$RELEASE_PUB" \
+    || { echo "the beta channel's current manifest does not verify"; exit 1; }
+  fix=$(jq -r '.security_fix // ""' "$W/prev/manifest.json")
+  [ -z "$fix" ] || [[ "$fix" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "the beta manifest's security_fix is not a version: $fix"; exit 1; }
+fi
+echo "security_fix: ${fix:-none}"
+
+jq -n --arg v "$V" --arg min "$MIN_FROM" --arg p "$(date -u +%FT%TZ)" --argjson f "$files" --argjson i "$inst" --arg fix "$fix" \
+  '{schema: 1, channel: "beta", version: $v, published: $p, min_from: $min, files: $f, install_script: $i}
+   + (if $fix == "" then {} else {security_fix: $fix} end)' > "$W/manifest.json"
 BHP_RELEASE_KEY="$BHP_RELEASE_KEY" "$W/bhp-release" sign "$W/manifest.json" "$W/manifest.json.sig"
 # Checked the way a server checks it: against the key servers have built in
 # (a secret replaced by mistake would sign releases no server accepts).

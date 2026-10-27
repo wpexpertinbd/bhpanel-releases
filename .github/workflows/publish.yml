@@ -46,6 +46,7 @@ jobs:
           for f in *; do
             case "$f" in
               "bhpanel-$v-linux-x86_64.tar.gz"|"bhpanel-$v-linux-x86_64.tar.gz.sha256"|"bhpanel-$v-linux-aarch64.tar.gz"|"bhpanel-$v-linux-aarch64.tar.gz.sha256"|build.txt) ;;
+              security.txt) [ "$(cat security.txt)" = yes ] || { echo "security.txt must say yes"; exit 1; } ;;
               *) echo "unexpected file: $f"; exit 1 ;;
             esac
           done
@@ -53,6 +54,12 @@ jobs:
             echo "## BHPanel $v - waiting for approval"
             echo
             echo "Built by: $(cat build.txt 2>/dev/null || echo unknown)"
+            echo
+            if [ -f security.txt ]; then
+              echo "**Security release:** panels older than $v will show this update as urgent."
+            else
+              echo "Not marked as a security release."
+            fi
             echo
             echo '```'
             sha256sum bhpanel-*.tar.gz
