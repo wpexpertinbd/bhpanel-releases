@@ -151,7 +151,13 @@ PY
   # after the restart nothing here is seen. The key is never written out.
   local shown=() prev="" rerun
   for a in "$@"; do
-    if [ "$prev" = --license ]; then shown+=("YOUR-KEY"); else shown+=("$a"); fi
+    # Every spelling the installer takes (Codex): the key itself is never shown.
+    case "$prev:$a" in
+      --license:*|--licence:*) shown+=("YOUR-KEY") ;;
+      *:--license=*) shown+=("--license=YOUR-KEY") ;;
+      *:--licence=*) shown+=("--licence=YOUR-KEY") ;;
+      *) shown+=("$a") ;;
+    esac
     prev="$a"
   done
   # How bash was started: through sudo, and with the key in its environment -
