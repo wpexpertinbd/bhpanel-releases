@@ -146,6 +146,26 @@ PY
   [ -f "$dest/installer/bhpanel-install.sh" ] && [ ! -L "$dest/installer" ] || die "the release has no installer"
   (cd "$dest/bin" && sha256sum -c --strict --quiet SHA256SUMS) || die "the release's binaries do not match its SHA256SUMS"
 
+  # The line that carries on where this one stops (after a restart for disk
+  # quota, say): the installer prints it before it offers to restart, since
+  # after the restart nothing here is seen. The key is never written out.
+  local shown=() prev="" rerun
+  for a in "$@"; do
+    if [ "$prev" = --license ]; then shown+=("YOUR-KEY"); else shown+=("$a"); fi
+    prev="$a"
+  done
+  # How bash was started: through sudo, and with the key in its environment -
+  # written as the placeholder, never the key.
+  local runner="bash"
+  [ -n "${BHP_LICENSE:-}" ] && runner="BHP_LICENSE=YOUR-KEY bash"
+  [ -n "${SUDO_USER:-}" ] && runner="sudo $runner"
+  if [ "$#" -gt 0 ]; then
+    rerun="$(printf 'curl -fsSL %s/install.sh | %s -s --%s' "$BASE" "$runner" "$(printf ' %q' "${shown[@]}")")"
+  else
+    rerun="$(printf 'curl -fsSL %s/install.sh | %s' "$BASE" "$runner")"
+  fi
+  export BHP_RERUN_CMD="$rerun"
+
   say "4. the installer ($dest)"
   cd "$dest"
   local rc=0
@@ -170,16 +190,7 @@ PY
     # run again, so the same line continues where it stopped.
     printf '\nThe release is unpacked in %s\n' "$dest"
     printf 'To continue (after a reboot, if the installer asked for one), run the same command again:\n'
-    local shown=() prev=""
-    for a in "$@"; do
-      if [ "$prev" = --license ]; then shown+=("YOUR-KEY"); else shown+=("$a"); fi
-      prev="$a"
-    done
-    if [ "$#" -gt 0 ]; then
-      printf '    curl -fsSL %s/install.sh | bash -s --%s\n' "$BASE" "$(printf ' %q' "${shown[@]}")"
-    else
-      printf '    curl -fsSL %s/install.sh | bash\n' "$BASE"
-    fi
+    printf '    %s\n' "$rerun"
   fi
   return "$rc"
 }
