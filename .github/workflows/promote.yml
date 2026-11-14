@@ -1,14 +1,20 @@
 name: promote
 
-# Moves the version that is in beta to the stable channel, after the owner
-# approves the "sign" environment. Run by hand once beta has run cleanly.
+# Makes a beta version the stable channel's, after the owner approves the
+# "sign" environment: one that ran at least 7 days in beta (ci/promote.sh), or
+# a security fix. Run by hand.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: The version in beta to make stable (e.g. 0.2.41)
+        description: The beta version to make stable (e.g. 0.2.162) - at least 7 days in beta
         required: true
         type: string
+      security:
+        description: A security fix - skip the 7 days in beta
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -36,4 +42,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BHP_RELEASE_KEY: ${{ secrets.BHP_RELEASE_KEY }}
           V: ${{ inputs.version }}
-        run: bash ci/promote.sh "$V"
+          SEC: ${{ inputs.security && 'security' || '' }}
+        run: bash ci/promote.sh "$V" ${SEC:+"$SEC"}

@@ -80,6 +80,13 @@ if ! gh release view channel-beta --repo "$REPO" >/dev/null 2>&1; then
   gh release create channel-beta --repo "$REPO" --prerelease --title "Channel: beta" \
     --notes "The beta channel's signed manifest. The newest is the one here."
 fi
+# The same signed manifest kept with the version itself: channel-beta moves on
+# with every release, and promote.sh takes a version only from what its beta
+# servers really got - a week later, when beta names a newer one. Kept BEFORE
+# beta moves to it, so no version reaches beta without its own copy (Codex).
+cp "$W/manifest.json" "$W/manifest-beta.json"
+cp "$W/manifest.json.sig" "$W/manifest-beta.json.sig"
+gh release upload "v$V" --repo "$REPO" --clobber "$W/manifest-beta.json" "$W/manifest-beta.json.sig"
 gh release upload channel-beta --repo "$REPO" --clobber "$W/manifest.json" "$W/manifest.json.sig"
 cat "$W/manifest.json"
 
